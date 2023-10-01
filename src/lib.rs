@@ -1,6 +1,8 @@
+use bitvec::prelude::*;
 use std::error::Error;
 use std::str;
-use bitvec::prelude::*;
+
+pub type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
 const ALPHABET: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
@@ -8,13 +10,12 @@ fn encode_table(alphabet: &str) -> [u8; 64] {
     alphabet.as_bytes().try_into().unwrap()
 }
 
-pub fn u8_to_b64(inp: &[u8]) -> Result<String, Box<dyn Error>> {
+pub fn u8_to_b64(inp: &[u8]) -> Result<String> {
     let alphabet = encode_table(ALPHABET);
     let mut encoded: Vec<u8> = Vec::new();
 
     let bits = inp.view_bits::<Msb0>();
-    let alignment = align_up(bits.len(), 24);
-    let remainder = alignment - bits.len();
+    let remainder = align_up(bits.len(), 24) - bits.len();
 
     for i in bits.chunks(6) {
         if i.len() < 6 {
@@ -26,9 +27,7 @@ pub fn u8_to_b64(inp: &[u8]) -> Result<String, Box<dyn Error>> {
             bv.extend_from_bitslice(&bitvec![u8, Msb0; 0; pad_zero]);
 
             encoded.push(alphabet[bv.load_be::<u8>() as usize]);
-            for _ in 0..padding {
-                encoded.push(0x3D)
-            }
+            encoded.extend(vec![0x3D; padding]);
         } else {
             encoded.push(alphabet[i.load_be::<u8>() as usize]);
         }
@@ -37,10 +36,10 @@ pub fn u8_to_b64(inp: &[u8]) -> Result<String, Box<dyn Error>> {
     Ok(str::from_utf8(&encoded)?.to_owned())
 }
 
-pub fn hex_to_u8(hex: &str) -> Result<Vec<u8>, Box<dyn Error>> {
-    let hex: Result<Vec<_>, _> = (0..hex.len())
+pub fn hex_to_u8(hex: &str) -> Result<Vec<u8>> {
+    let hex: std::result::Result<Vec<_>, _> = (0..hex.len())
         .step_by(2)
-        .map(|i| u8::from_str_radix(&hex[i..i+2], 16))
+        .map(|i| u8::from_str_radix(&hex[i..i + 2], 16))
         .collect();
 
     Ok(hex?)
@@ -55,8 +54,8 @@ fn align_up(num: usize, to: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
     use super::*;
+    use std::collections::HashMap;
 
     #[test]
     fn encode_str_b64() {
