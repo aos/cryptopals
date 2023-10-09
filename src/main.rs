@@ -3,11 +3,7 @@ use cryptopals::{calculate_frequency_score, hex_to_u8, u8_to_b64, Result, ALPHAB
 use std::str;
 
 fn main() -> Result<()> {
-    println!(
-        "{:?}",
-        c3("1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736")?
-    );
-
+    println!("{:?}", c4("./inputs/s1c4_input.txt")?);
     Ok(())
 }
 
@@ -52,6 +48,38 @@ fn c3(input: &str) -> Result<(char, String, f64)> {
     Ok(y)
 }
 
+fn c4(filename: &str) -> Result<(char, String, String, f64)> {
+    let input = std::fs::read_to_string(filename)?;
+    let mut max_line: (char, String, String, f64) = (' ', "".to_owned(), "".to_owned(), 0.0);
+    for l in input.lines() {
+        let s = hex_to_u8(l)?;
+        let z: Vec<(u8, Vec<u8>)> = ALPHABET
+            .as_bytes()
+            .iter()
+            .map(|x| (*x, s.iter().map(|inp| *x ^ *inp).collect::<Vec<u8>>()))
+            .collect();
+
+        let y = z
+            .iter()
+            .map(|(k, chars)| (k, chars, calculate_frequency_score(chars)))
+            .fold((' ', "".to_owned(), 0.0), |acc, (&k, c, v)| {
+                match str::from_utf8(c) {
+                    Ok(s) => if f64::max(acc.2, v) == v {
+                                (k as char, s.to_owned(), v)
+                            } else {
+                                acc
+                            }
+                    Err(_) => acc
+                }
+            });
+
+        if f64::max(y.2, max_line.3) == y.2 {
+            max_line = (y.0, l.to_owned(), y.1, y.2);
+        }
+    }
+    Ok(max_line)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -80,6 +108,13 @@ mod tests {
     fn challenge_3() -> Result<()> {
         let c3 = c3("1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736")?;
         assert_eq!(c3.0, 'X');
+        Ok(())
+    }
+
+    #[test]
+    fn challenge_4() -> Result<()> {
+        let c4 = c4("./inputs/s1c4_input.txt")?;
+        assert_eq!(c4.1, "7b5a4215415d544115415d5015455447414c155c46155f4058455c5b523f");
         Ok(())
     }
 }
