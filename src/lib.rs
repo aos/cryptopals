@@ -7,7 +7,6 @@ pub type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
 pub const ALPHABET: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 // This also encodes the space character (' ') on index 0
-// with a frequency almost twice as the most frequent ('e')
 // https://web.archive.org/web/20170918020907/http://www.data-compression.com/english.html
 const LETTER_FREQUENCY: [f64; 27] = [
     0.1918182, 0.0651738, 0.0124248, 0.0217339, 0.0349835, 0.1041442, 0.0197881, 0.0158610,
@@ -63,18 +62,19 @@ fn align_up(num: usize, to: usize) -> usize {
 }
 
 pub fn calculate_frequency_score(input: &[u8]) -> f64 {
-    let mut total_score: f64 = 0.0;
-    let mut counter: HashMap<char, usize> = HashMap::new();
-    for c in input {
-        if (*c as char).is_ascii_alphabetic() || (*c as char) == ' ' {
-            let count = counter.entry(*c as char).or_insert(0);
-            *count += 1;
-        }
-    }
-    for (ch, num) in counter {
-        total_score += LETTER_FREQUENCY[(ch as usize % 32) as usize] * num as f64;
-    }
-    total_score
+    input
+        .iter()
+        .fold(HashMap::<char, usize>::new(), |mut acc, &c| {
+            if (c as char).is_ascii_alphabetic() || (c as char) == ' ' {
+                let count = acc.entry(c as char).or_insert(0);
+                *count += 1;
+            }
+            acc
+        })
+        .iter()
+        .fold(0.0, |total, (&ch, &num)| {
+            total + (LETTER_FREQUENCY[ch as usize % 32] * num as f64)
+        })
 }
 
 #[cfg(test)]

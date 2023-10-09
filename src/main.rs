@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use cryptopals::{calculate_frequency_score, hex_to_u8, u8_to_b64, Result, ALPHABET};
 use std::str;
 
@@ -11,7 +12,7 @@ fn main() -> Result<()> {
 }
 
 fn c1(inp: &str) -> Result<String> {
-    Ok(u8_to_b64(&hex_to_u8(inp)?)?)
+    u8_to_b64(&hex_to_u8(inp)?)
 }
 
 fn c2(hex1: &str, hex2: &str) -> Result<String> {
@@ -40,13 +41,11 @@ fn c3(input: &str) -> Result<(char, String, f64)> {
     let y = z
         .iter()
         .map(|(k, chars)| (k, chars, calculate_frequency_score(chars)))
-        .fold(('a', "".to_owned(), 0.0), |acc, (k, c, v)| {
-            let i = (*k as char, str::from_utf8(c).unwrap().to_owned(), v);
-            let max = f64::max(acc.2, v);
-            if max == v {
-                i
+        .fold((' ', "".to_owned(), 0.0), |acc, (&k, c, v)| {
+            if f64::max(acc.2, v) == v {
+                (k as char, str::from_utf8(c).unwrap().to_owned(), v)
             } else {
-                (acc.0 as char, acc.1, acc.2)
+                acc
             }
         });
 
