@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use cryptopals::{calculate_frequency_score, hex_to_u8, u8_to_b64, Result, ALPHABET};
+use cryptopals::{calculate_frequency_score, hex_to_u8, Base64, Result, ALPHABET};
 use std::str;
 
 fn main() -> Result<()> {
@@ -8,7 +8,7 @@ fn main() -> Result<()> {
 }
 
 fn c1(inp: &str) -> Result<String> {
-    u8_to_b64(&hex_to_u8(inp)?)
+    hex_to_u8(inp)?.to_base64()
 }
 
 fn c2(hex1: &str, hex2: &str) -> Result<String> {
@@ -62,16 +62,19 @@ fn c4(filename: &str) -> Result<(char, String, String, f64)> {
         let y = z
             .iter()
             .map(|(k, chars)| (k, chars, calculate_frequency_score(chars)))
-            .fold((' ', "".to_owned(), 0.0), |acc, (&k, c, v)| {
-                match str::from_utf8(c) {
-                    Ok(s) => if f64::max(acc.2, v) == v {
-                                (k as char, s.to_owned(), v)
-                            } else {
-                                acc
-                            }
-                    Err(_) => acc
-                }
-            });
+            .fold(
+                (' ', "".to_owned(), 0.0),
+                |acc, (&k, c, v)| match str::from_utf8(c) {
+                    Ok(s) => {
+                        if f64::max(acc.2, v) == v {
+                            (k as char, s.to_owned(), v)
+                        } else {
+                            acc
+                        }
+                    }
+                    Err(_) => acc,
+                },
+            );
 
         if f64::max(y.2, max_line.3) == y.2 {
             max_line = (y.0, l.to_owned(), y.1, y.2);
@@ -114,7 +117,10 @@ mod tests {
     #[test]
     fn challenge_4() -> Result<()> {
         let c4 = c4("./inputs/s1c4_input.txt")?;
-        assert_eq!(c4.1, "7b5a4215415d544115415d5015455447414c155c46155f4058455c5b523f");
+        assert_eq!(
+            c4.1,
+            "7b5a4215415d544115415d5015455447414c155c46155f4058455c5b523f"
+        );
         Ok(())
     }
 }

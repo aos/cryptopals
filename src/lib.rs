@@ -19,30 +19,36 @@ pub fn encode_table(alphabet: &str) -> [u8; 64] {
     alphabet.as_bytes().try_into().unwrap()
 }
 
-pub fn u8_to_b64(inp: &[u8]) -> Result<String> {
-    let alphabet = encode_table(ALPHABET);
-    let mut encoded: Vec<u8> = Vec::new();
+pub trait Base64 {
+    fn to_base64(&self) -> Result<String>;
+}
 
-    let bits = inp.view_bits::<Msb0>();
-    let remainder = align_up(bits.len(), 24) - bits.len();
+impl Base64 for [u8] {
+    fn to_base64(&self) -> Result<String> {
+        let alphabet = encode_table(ALPHABET);
+        let mut encoded: Vec<u8> = Vec::new();
 
-    for i in bits.chunks(6) {
-        if i.len() < 6 {
-            let mut bv = bitvec![u8, Msb0;];
-            let pad_zero = 6 - i.len();
-            let padding = (remainder - pad_zero) / 6;
+        let bits = self.view_bits::<Msb0>();
+        let remainder = align_up(bits.len(), 24) - bits.len();
 
-            bv.extend(i);
-            bv.extend_from_bitslice(&bitvec![u8, Msb0; 0; pad_zero]);
+        for i in bits.chunks(6) {
+            if i.len() < 6 {
+                let mut bv = bitvec![u8, Msb0;];
+                let pad_zero = 6 - i.len();
+                let padding = (remainder - pad_zero) / 6;
 
-            encoded.push(alphabet[bv.load_be::<u8>() as usize]);
-            encoded.extend(vec![0x3D; padding]);
-        } else {
-            encoded.push(alphabet[i.load_be::<u8>() as usize]);
+                bv.extend(i);
+                bv.extend_from_bitslice(&bitvec![u8, Msb0; 0; pad_zero]);
+
+                encoded.push(alphabet[bv.load_be::<u8>() as usize]);
+                encoded.extend(vec![0x3D; padding]);
+            } else {
+                encoded.push(alphabet[i.load_be::<u8>() as usize]);
+            }
         }
-    }
 
-    Ok(str::from_utf8(&encoded)?.to_owned())
+        Ok(str::from_utf8(&encoded)?.to_owned())
+    }
 }
 
 pub fn hex_to_u8(hex: &str) -> Result<Vec<u8>> {
@@ -95,7 +101,7 @@ mod tests {
             ("light w", "bGlnaHQgdw=="),
         ]);
         for (test, expected) in &tests {
-            let b64 = u8_to_b64(test.as_bytes()).unwrap_or(String::from(""));
+            let b64 = test.as_bytes().to_base64().unwrap_or(String::from(""));
             assert_eq!(b64, expected.to_owned());
         }
     }
@@ -110,7 +116,7 @@ mod tests {
         ]);
         for (test, expected) in &tests {
             let to_u8 = hex_to_u8(test).unwrap_or(Vec::new());
-            let b64 = u8_to_b64(&to_u8).unwrap_or(String::from(""));
+            let b64 = &to_u8.to_base64().unwrap_or(String::from(""));
             assert_eq!(b64, expected.to_owned());
         }
     }
