@@ -83,13 +83,24 @@ pub fn calculate_frequency_score(input: &[u8]) -> f64 {
         })
 }
 
+pub fn hamming_distance(first: &str, second: &str) -> usize {
+    let f_bits = first.as_bytes().view_bits::<Lsb0>();
+    let s_bits = second.as_bytes().view_bits::<Lsb0>();
+
+    f_bits
+        .iter()
+        .zip(s_bits.iter())
+        .map(|(f, s)| (*f as usize) ^ (*s as usize))
+        .sum()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::collections::HashMap;
 
     #[test]
-    fn encode_str_b64() {
+    fn encode_str_b64() -> Result<()> {
         let tests = HashMap::from([
             ("Cat", "Q2F0"),
             ("Ca", "Q2E="),
@@ -101,13 +112,14 @@ mod tests {
             ("light w", "bGlnaHQgdw=="),
         ]);
         for (test, expected) in &tests {
-            let b64 = test.as_bytes().to_base64().unwrap_or(String::from(""));
+            let b64 = test.as_bytes().to_base64()?;
             assert_eq!(b64, expected.to_owned());
         }
+        Ok(())
     }
 
     #[test]
-    fn encode_hex_b64() {
+    fn encode_hex_b64() -> Result<()> {
         let tests = HashMap::from([
             (
             "49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d",
@@ -115,9 +127,15 @@ mod tests {
             ),
         ]);
         for (test, expected) in &tests {
-            let to_u8 = hex_to_u8(test).unwrap_or(Vec::new());
-            let b64 = &to_u8.to_base64().unwrap_or(String::from(""));
+            let to_u8 = hex_to_u8(test)?;
+            let b64 = &to_u8.to_base64()?;
             assert_eq!(b64, expected.to_owned());
         }
+        Ok(())
+    }
+
+    #[test]
+    fn test_hamming_distance() {
+        assert_eq!(hamming_distance("this is a test", "wokka wokka!!!"), 37);
     }
 }

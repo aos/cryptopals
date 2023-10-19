@@ -1,10 +1,11 @@
 #![allow(dead_code)]
-use cryptopals::{calculate_frequency_score, hex_to_u8, Base64, Result, ALPHABET};
+use cryptopals::{
+    calculate_frequency_score, hamming_distance, hex_to_u8, Base64, Result, ALPHABET,
+};
 use std::str;
 
 fn main() -> Result<()> {
-    println!("{}", c5("Burning 'em, if you ain't quick and nimble
-I go crazy when I hear a cymbal")?);
+    println!("{}", hamming_distance("this is a test", "wokka wokka!!!"));
 
     Ok(())
 }
@@ -86,10 +87,15 @@ fn c4(filename: &str) -> Result<(char, String, String, f64)> {
 }
 
 fn c5(input: &str) -> Result<String> {
-    Ok(input.bytes()
+    Ok(input
+        .bytes()
         .zip("ICE".bytes().cycle())
         .map(|(first, second)| format!("{:02x}", first ^ second))
         .collect::<String>())
+}
+
+fn c6(filename: &str) -> Result<String> {
+    Ok("ok!".to_owned())
 }
 
 #[cfg(test)]
