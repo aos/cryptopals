@@ -1,11 +1,12 @@
 #![allow(dead_code)]
 use cryptopals::{
-    calculate_frequency_score, hamming_distance, hex_to_u8, Base64, Result, ALPHABET,
+    calculate_frequency_score, hamming_distance, hex_to_u8, repeating_key_xor, Base64, Result,
+    B64_ALPHABET,
 };
 use std::str;
 
 fn main() -> Result<()> {
-    println!("{}", hamming_distance("this is a test", "wokka wokka!!!"));
+    println!("{}", hamming_distance(b"this is a test", b"wokka wokka!!!"));
 
     Ok(())
 }
@@ -31,7 +32,7 @@ fn c2(hex1: &str, hex2: &str) -> Result<String> {
 
 fn c3(input: &str) -> Result<(char, String, f64)> {
     let s = hex_to_u8(input)?;
-    let z: Vec<(u8, Vec<u8>)> = ALPHABET
+    let z: Vec<(u8, Vec<u8>)> = B64_ALPHABET
         .as_bytes()
         .iter()
         .map(|x| (*x, s.iter().map(|inp| *x ^ *inp).collect::<Vec<u8>>()))
@@ -56,7 +57,7 @@ fn c4(filename: &str) -> Result<(char, String, String, f64)> {
     let mut max_line: (char, String, String, f64) = (' ', "".to_owned(), "".to_owned(), 0.0);
     for l in input.lines() {
         let s = hex_to_u8(l)?;
-        let z: Vec<(u8, Vec<u8>)> = ALPHABET
+        let z: Vec<(u8, Vec<u8>)> = B64_ALPHABET
             .as_bytes()
             .iter()
             .map(|x| (*x, s.iter().map(|inp| *x ^ *inp).collect::<Vec<u8>>()))
@@ -87,14 +88,23 @@ fn c4(filename: &str) -> Result<(char, String, String, f64)> {
 }
 
 fn c5(input: &str) -> Result<String> {
-    Ok(input
-        .bytes()
-        .zip("ICE".bytes().cycle())
-        .map(|(first, second)| format!("{:02x}", first ^ second))
-        .collect::<String>())
+    Ok(repeating_key_xor("ICE", input))
 }
 
 fn c6(filename: &str) -> Result<String> {
+    let input = std::fs::read_to_string(filename)?;
+    let input_as_bytes = input.as_bytes();
+    assert!(input_as_bytes.len() >= 80);
+
+    for keysize in 2..40 {
+        println!("first: {:?}", &input_as_bytes[..keysize]);
+        println!("second: {:?}", &input_as_bytes[keysize..keysize * 2]);
+        let z = hamming_distance(
+            &input_as_bytes[..keysize],
+            &input_as_bytes[keysize..keysize * 2],
+        );
+        println!("keysize: {}, distance: {}", keysize, z / keysize);
+    }
     Ok("ok!".to_owned())
 }
 

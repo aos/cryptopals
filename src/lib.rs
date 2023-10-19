@@ -5,7 +5,7 @@ use std::str;
 
 pub type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
-pub const ALPHABET: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+pub const B64_ALPHABET: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 // This also encodes the space character (' ') on index 0
 // https://web.archive.org/web/20170918020907/http://www.data-compression.com/english.html
 const LETTER_FREQUENCY: [f64; 27] = [
@@ -25,7 +25,7 @@ pub trait Base64 {
 
 impl Base64 for [u8] {
     fn to_base64(&self) -> Result<String> {
-        let alphabet = encode_table(ALPHABET);
+        let alphabet = encode_table(B64_ALPHABET);
         let mut encoded: Vec<u8> = Vec::new();
 
         let bits = self.view_bits::<Msb0>();
@@ -83,9 +83,17 @@ pub fn calculate_frequency_score(input: &[u8]) -> f64 {
         })
 }
 
-pub fn hamming_distance(first: &str, second: &str) -> usize {
-    let f_bits = first.as_bytes().view_bits::<Lsb0>();
-    let s_bits = second.as_bytes().view_bits::<Lsb0>();
+pub fn repeating_key_xor(key: &str, input: &str) -> String {
+    input
+        .bytes()
+        .zip(key.bytes().cycle())
+        .map(|(first, second)| format!("{:02x}", first ^ second))
+        .collect::<String>()
+}
+
+pub fn hamming_distance(first: &[u8], second: &[u8]) -> usize {
+    let f_bits = first.view_bits::<Lsb0>();
+    let s_bits = second.view_bits::<Lsb0>();
 
     f_bits
         .iter()
@@ -136,6 +144,6 @@ mod tests {
 
     #[test]
     fn test_hamming_distance() {
-        assert_eq!(hamming_distance("this is a test", "wokka wokka!!!"), 37);
+        assert_eq!(hamming_distance(b"this is a test", b"wokka wokka!!!"), 37);
     }
 }
