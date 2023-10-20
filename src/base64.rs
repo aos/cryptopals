@@ -1,27 +1,24 @@
 use crate::{encode_table, Result};
 
 use bitvec::prelude::*;
+use std::convert::TryFrom;
+use std::error::Error;
+use std::ops::{Deref, DerefMut};
 use std::str;
 
 pub const B64_ALPHABET: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-fn align_up(num: usize, to: usize) -> usize {
-    // By subtracting one, we get "as close as possible"
-    // then we do integer division to get the "multiple"
-    // and multiply the multiple by the target number
-    ((num + to - 1) / to) * to
-}
+#[derive(Debug, PartialEq)]
+pub struct Base64(String);
 
-pub trait Base64 {
-    fn to_base64(&self) -> Result<String>;
-}
+impl TryFrom<&[u8]> for Base64 {
+    type Error = Box<dyn Error>;
 
-impl Base64 for [u8] {
-    fn to_base64(&self) -> Result<String> {
+    fn try_from(input: &[u8]) -> Result<Self> {
         let alphabet = encode_table(B64_ALPHABET);
         let mut encoded: Vec<u8> = Vec::new();
 
-        let bits = self.view_bits::<Msb0>();
+        let bits = input.view_bits::<Msb0>();
         let remainder = align_up(bits.len(), 24) - bits.len();
 
         for i in bits.chunks(6) {
@@ -40,6 +37,26 @@ impl Base64 for [u8] {
             }
         }
 
-        Ok(str::from_utf8(&encoded)?.to_owned())
+        Ok(Base64(str::from_utf8(&encoded)?.to_owned()))
     }
+}
+
+impl Deref for Base64 {
+    type Target = String;
+    fn deref(&self) -> &String {
+        &self.0
+    }
+}
+
+impl DerefMut for Base64 {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+fn align_up(num: usize, to: usize) -> usize {
+    // By subtracting one, we get "as close as possible"
+    // then we do integer division to get the "multiple"
+    // and multiply the multiple by the target number
+    ((num + to - 1) / to) * to
 }

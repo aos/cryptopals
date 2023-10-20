@@ -11,8 +11,8 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn c1(inp: &str) -> Result<String> {
-    hex_to_u8(inp)?.to_base64()
+fn c1(inp: &str) -> Result<Base64> {
+    hex_to_u8(inp)?.as_slice().try_into()
 }
 
 fn c2(hex1: &str, hex2: &str) -> Result<String> {
@@ -116,7 +116,7 @@ mod tests {
     fn challenge_1() -> Result<()> {
         let c1 = c1("49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d")?;
         assert_eq!(
-            c1,
+            *c1,
             "SSdtIGtpbGxpbmcgeW91ciBicmFpbiBsaWtlIGEgcG9pc29ub3VzIG11c2hyb29t".to_owned(),
         );
         Ok(())

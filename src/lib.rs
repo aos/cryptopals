@@ -82,8 +82,8 @@ mod tests {
             ("light w", "bGlnaHQgdw=="),
         ]);
         for (test, expected) in &tests {
-            let b64 = test.as_bytes().to_base64()?;
-            assert_eq!(b64, expected.to_owned());
+            let b64: Base64 = test.as_bytes().try_into()?;
+            assert_eq!(*b64, *expected);
         }
         Ok(())
     }
@@ -98,8 +98,8 @@ mod tests {
         ]);
         for (test, expected) in &tests {
             let to_u8 = hex_to_u8(test)?;
-            let b64 = &to_u8.to_base64()?;
-            assert_eq!(b64, expected.to_owned());
+            let b64: Base64 = to_u8.as_slice().try_into()?;
+            assert_eq!(*b64, *expected);
         }
         Ok(())
     }
