@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use cryptopals::{
-    calculate_frequency_score, hamming_distance, hex_to_u8, repeating_key_xor, Base64, Result,
-    B64_ALPHABET,
+    base64::{Base64, B64_ALPHABET},
+    calculate_frequency_score, hamming_distance, hex_to_u8, repeating_key_xor, Result,
 };
 use std::str;
 
