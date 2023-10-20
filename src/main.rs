@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use cryptopals::{
-    base64::{Base64, B64_ALPHABET},
+    base64::{encode_b64, B64_ALPHABET},
     calculate_frequency_score, hamming_distance, hex_to_u8, repeating_key_xor, Result,
 };
 use std::str;
@@ -11,8 +11,8 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn c1(inp: &str) -> Result<Base64> {
-    hex_to_u8(inp)?.as_slice().try_into()
+fn c1(inp: &str) -> Result<String> {
+    encode_b64(&hex_to_u8(inp)?)
 }
 
 fn c2(hex1: &str, hex2: &str) -> Result<String> {

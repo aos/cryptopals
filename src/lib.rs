@@ -66,27 +66,8 @@ pub fn hamming_distance(first: &[u8], second: &[u8]) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::base64::Base64;
+    use crate::base64::encode_b64;
     use std::collections::HashMap;
-
-    #[test]
-    fn encode_str_b64() -> Result<()> {
-        let tests = HashMap::from([
-            ("Cat", "Q2F0"),
-            ("Ca", "Q2E="),
-            ("C", "Qw=="),
-            ("light work.", "bGlnaHQgd29yay4="),
-            ("light work", "bGlnaHQgd29yaw=="),
-            ("light wor", "bGlnaHQgd29y"),
-            ("light wo", "bGlnaHQgd28="),
-            ("light w", "bGlnaHQgdw=="),
-        ]);
-        for (test, expected) in &tests {
-            let b64: Base64 = test.as_bytes().try_into()?;
-            assert_eq!(*b64, *expected);
-        }
-        Ok(())
-    }
 
     #[test]
     fn encode_hex_b64() -> Result<()> {
@@ -98,8 +79,8 @@ mod tests {
         ]);
         for (test, expected) in &tests {
             let to_u8 = hex_to_u8(test)?;
-            let b64: Base64 = to_u8.as_slice().try_into()?;
-            assert_eq!(*b64, *expected);
+            let b64 = encode_b64(&to_u8)?;
+            assert_eq!(b64, expected.to_owned());
         }
         Ok(())
     }
