@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 use cryptopals::{
     base64::{decode_b64, encode_b64},
-    cipher::{find_repeating_xor_key, find_single_byte_xor, repeating_xor},
-    hex_to_u8, Result,
+    cipher::{find_repeating_xor_key, find_single_byte_xor_key, make_repeating_xor},
+    hex_to_u8, u8_to_hex, Result,
 };
 use std::str;
 
@@ -31,7 +31,7 @@ fn c2(hex1: &str, hex2: &str) -> Result<String> {
 
 fn c3(input: &str) -> Result<(u8, String, f64)> {
     let s = hex_to_u8(input)?;
-    Ok(find_single_byte_xor(&s))
+    Ok(find_single_byte_xor_key(&s))
 }
 
 fn c4(filename: &str) -> Result<(u8, String, String, f64)> {
@@ -39,9 +39,9 @@ fn c4(filename: &str) -> Result<(u8, String, String, f64)> {
     let mut min_line: (u8, String, String, f64) = (0, "".to_owned(), "".to_owned(), f64::MAX);
     for l in input.lines() {
         let s = hex_to_u8(l)?;
-        let y = find_single_byte_xor(&s);
+        let y = find_single_byte_xor_key(&s);
 
-        if f64::min(y.2, min_line.3) == y.2 {
+        if y.2 < min_line.3 {
             min_line = (y.0, l.to_owned(), y.1, y.2);
         }
     }
@@ -49,14 +49,17 @@ fn c4(filename: &str) -> Result<(u8, String, String, f64)> {
 }
 
 fn c5(input: &str) -> Result<String> {
-    Ok(repeating_xor("ICE".as_bytes(), input.as_bytes()))
+    Ok(u8_to_hex(&make_repeating_xor(
+        "ICE".as_bytes(),
+        input.as_bytes(),
+    )))
 }
 
 fn c6(filename: &str) -> Result<String> {
     let input = decode_b64(&std::fs::read_to_string(filename)?);
     let key = find_repeating_xor_key(&input);
 
-    Ok(str::from_utf8(&hex_to_u8(&repeating_xor(&key, &input))?)?.to_owned())
+    Ok(String::from_utf8(make_repeating_xor(&key, &input))?)
 }
 
 #[cfg(test)]

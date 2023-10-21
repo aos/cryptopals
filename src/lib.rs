@@ -25,6 +25,13 @@ pub fn hex_to_u8(hex: &str) -> Result<Vec<u8>> {
     Ok(hex?)
 }
 
+pub fn u8_to_hex(input: &[u8]) -> String {
+    input
+        .iter()
+        .map(|c| format!("{:02x}", c))
+        .collect::<String>()
+}
+
 // Given a stream of text bytes, calculates the letter frequency distribution and then gets the
 // absolute diff of the frequency compared to the letters in the english language, normalized by
 // the length of text
@@ -44,7 +51,19 @@ pub fn calculate_fitting_quotient(input: &[u8]) -> f64 {
         / (dist_text.len() as f64)
 }
 
-pub fn hamming_distance(first: &[u8], second: &[u8]) -> usize {
+// Normalized hamming distance over the input and keysize
+pub fn normalized_hamming_distance(input: &[u8], keysize: usize) -> f64 {
+    let z: Vec<f64> = input
+        .chunks(keysize)
+        .map(|chunk| {
+            (hamming_distance(chunk, &input[..keysize])
+                + hamming_distance(chunk, &input[keysize..keysize * 2])) as f64
+        })
+        .collect();
+    z.iter().sum::<f64>() / z.len() as f64 / keysize as f64
+}
+
+fn hamming_distance(first: &[u8], second: &[u8]) -> usize {
     let f_bits = first.view_bits::<Lsb0>();
     let s_bits = second.view_bits::<Lsb0>();
 

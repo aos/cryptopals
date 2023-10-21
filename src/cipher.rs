@@ -1,16 +1,15 @@
-use crate::{calculate_fitting_quotient, hamming_distance};
+use crate::{calculate_fitting_quotient, normalized_hamming_distance};
 use std::str;
 
-pub fn single_byte_xor(input: &[u8], key: u8) -> Vec<u8> {
+pub fn make_single_byte_xor(input: &[u8], key: u8) -> Vec<u8> {
     // XOR each byte in input with the key
     input.iter().map(|x| x ^ key).collect()
 }
 
-pub fn find_single_byte_xor(input: &[u8]) -> (u8, String, f64) {
-    // XOR each byte in input with all u8 bytes
-    // collect by alphabet, XOR result
+pub fn find_single_byte_xor_key(input: &[u8]) -> (u8, String, f64) {
+    // XOR each byte in input with all u8 bytes, collect by key
     let z: Vec<(u8, Vec<u8>)> = (0..=255)
-        .map(|x| (x, crate::cipher::single_byte_xor(input, x)))
+        .map(|x| (x, crate::cipher::make_single_byte_xor(input, x)))
         .collect();
 
     z.iter()
@@ -22,7 +21,8 @@ pub fn find_single_byte_xor(input: &[u8]) -> (u8, String, f64) {
             (0, String::new(), f64::MAX),
             |acc, (&k, c, v)|
                 // get lowest fitting quotient
-                if f64::min(acc.2, v) == v {
+                if v < acc.2 {
+                    // safe because we already filtered to make sure it's okay
                     (k, str::from_utf8(c).unwrap().to_owned(), v)
                 } else {
                     acc
@@ -30,33 +30,31 @@ pub fn find_single_byte_xor(input: &[u8]) -> (u8, String, f64) {
         )
 }
 
-pub fn repeating_xor(key: &[u8], input: &[u8]) -> String {
+pub fn make_repeating_xor(key: &[u8], input: &[u8]) -> Vec<u8> {
     input
         .iter()
         .zip(key.iter().cycle())
-        .map(|(first, second)| format!("{:02x}", first ^ second))
-        .collect::<String>()
+        .map(|(first, second)| first ^ second)
+        .collect::<Vec<u8>>()
 }
 
 pub fn find_repeating_xor_size(input: &[u8]) -> usize {
     let max_keysize = usize::min(40, input.len() / 2);
-    let mut possible_key = (0, usize::MAX); // (keysize, distance)
-
-    for keysize in 2..max_keysize {
-        // TODO(als): this needs to be fixed, we can't hardcode the keysize
-        let z =
-            hamming_distance(&input[..keysize * 4], &input[keysize * 4..keysize * 4 * 2]) / keysize;
-        if usize::min(possible_key.1, z) == z {
-            possible_key = (keysize, z);
+    let mut keysize = 0;
+    let mut distance = f64::MAX;
+    for k in 2..max_keysize {
+        let x = normalized_hamming_distance(input, k);
+        if x < distance {
+            distance = x;
+            keysize = k;
         }
     }
-
-    possible_key.0
+    keysize
 }
 
 pub fn find_repeating_xor_key(input: &[u8]) -> Vec<u8> {
     let possible_keysize = find_repeating_xor_size(input);
-    let mut key: Vec<u8> = Vec::with_capacity(possible_keysize);
+    let mut key: Vec<u8> = Vec::new();
 
     let mut chunked: Vec<Vec<u8>> = Vec::new();
     for i in input.chunks(possible_keysize) {
@@ -70,7 +68,7 @@ pub fn find_repeating_xor_key(input: &[u8]) -> Vec<u8> {
         }
     }
     for block in transposed {
-        let z = find_single_byte_xor(&block);
+        let z = find_single_byte_xor_key(&block);
         key.push(z.0);
     }
 
