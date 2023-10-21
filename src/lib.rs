@@ -1,23 +1,20 @@
 pub mod base64;
+pub mod cipher;
 
 use bitvec::prelude::*;
-use std::collections::HashMap;
 use std::error::Error;
+use std::str;
 
 pub type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
 // This also encodes the space character (' ') on index 0
 // https://web.archive.org/web/20170918020907/http://www.data-compression.com/english.html
 const LETTER_FREQUENCY: [f64; 27] = [
-    0.1918182, 0.0651738, 0.0124248, 0.0217339, 0.0349835, 0.1041442, 0.0197881, 0.0158610,
-    0.0492888, 0.0558094, 0.0009033, 0.0050529, 0.0331490, 0.0202124, 0.0564513, 0.0596302,
-    0.0137645, 0.0008606, 0.0497563, 0.0515760, 0.0729357, 0.0225134, 0.0082903, 0.0171272,
-    0.0013692, 0.0145984, 0.0007836,
+    19.18182, 8.2389258, 1.5051398, 2.8065007, 4.2904556, 12.813865, 2.2476217, 2.0327458,
+    6.1476691, 6.1476691, 0.1543474, 0.7787989, 4.0604477, 2.4271893, 6.8084376, 7.5731132,
+    1.9459884, 0.0958366, 6.0397268, 6.3827211, 9.1357551, 2.7822893, 0.9866131, 2.3807842,
+    0.151321, 1.9913847, 0.0746517,
 ];
-
-pub fn encode_table(alphabet: &str) -> [u8; 64] {
-    alphabet.as_bytes().try_into().unwrap()
-}
 
 pub fn hex_to_u8(hex: &str) -> Result<Vec<u8>> {
     let hex: std::result::Result<Vec<_>, _> = (0..hex.len())
@@ -28,28 +25,47 @@ pub fn hex_to_u8(hex: &str) -> Result<Vec<u8>> {
     Ok(hex?)
 }
 
-pub fn calculate_frequency_score(input: &[u8]) -> f64 {
-    input
+// Given a stream of text bytes, calculates the letter frequency distribution and then gets the
+// absolute diff of the frequency compared to the letters in the english language, normalized by
+// the length of text
+pub fn calculate_fitting_quotient(input: &[u8]) -> f64 {
+    let mut dist_text: Vec<f64> = vec![0.0; LETTER_FREQUENCY.len()];
+    for &c in input
         .iter()
-        .fold(HashMap::<char, usize>::new(), |mut acc, &c| {
-            if (c as char).is_ascii_alphabetic() || (c as char) == ' ' {
-                let count = acc.entry(c as char).or_insert(0);
-                *count += 1;
-            }
-            acc
-        })
+        .filter(|&c| c.is_ascii_alphabetic() || (*c as char) == ' ')
+    {
+        dist_text[c as usize % 32] += 1.0;
+    }
+    dist_text
         .iter()
-        .fold(0.0, |total, (&ch, &num)| {
-            total + (LETTER_FREQUENCY[ch as usize % 32] * num as f64)
-        })
+        .zip(LETTER_FREQUENCY.iter())
+        .map(|(ch, freq)| ((ch * 100.0 / (input.len() as f64)) - freq).abs())
+        .sum::<f64>()
+        / (dist_text.len() as f64)
 }
 
-pub fn repeating_key_xor(key: &str, input: &str) -> String {
-    input
-        .bytes()
-        .zip(key.bytes().cycle())
-        .map(|(first, second)| format!("{:02x}", first ^ second))
-        .collect::<String>()
+pub fn decrypt_single_byte_xor(input: &[u8]) -> (char, String, f64) {
+    // XOR each byte in input with all u8 bytes
+    // collect by alphabet, XOR result
+    let z: Vec<(u8, Vec<u8>)> = (0..=255)
+        .map(|x| (x, crate::cipher::single_byte_xor(input, x)))
+        .collect();
+
+    z.iter()
+        // Calculate fitting quotient for each single byte XOR
+        .map(|(k, chars)| (k, chars, calculate_fitting_quotient(chars)))
+        // Make sure it's printable
+        .filter(|(_, c, _)| str::from_utf8(c).is_ok())
+        .fold(
+            (' ', String::new(), f64::MAX),
+            |acc, (&k, c, v)|
+                // get lowest fitting quotient
+                if f64::min(acc.2, v) == v {
+                    (k as char, str::from_utf8(c).unwrap().to_owned(), v)
+                } else {
+                    acc
+                }
+        )
 }
 
 pub fn hamming_distance(first: &[u8], second: &[u8]) -> usize {

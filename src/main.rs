@@ -1,12 +1,14 @@
 #![allow(dead_code)]
 use cryptopals::{
-    base64::{encode_b64, B64_ALPHABET},
-    calculate_frequency_score, hamming_distance, hex_to_u8, repeating_key_xor, Result,
+    base64::{decode_b64, encode_b64},
+    cipher::repeating_key_xor,
+    decrypt_single_byte_xor, hamming_distance, hex_to_u8, Result,
 };
 use std::str;
 
 fn main() -> Result<()> {
-    println!("{}", hamming_distance(b"this is a test", b"wokka wokka!!!"));
+    c6("./inputs/s1c6_input.txt")?;
+    // c6("./inputs/s1c6_test.txt")?;
 
     Ok(())
 }
@@ -32,59 +34,21 @@ fn c2(hex1: &str, hex2: &str) -> Result<String> {
 
 fn c3(input: &str) -> Result<(char, String, f64)> {
     let s = hex_to_u8(input)?;
-    let z: Vec<(u8, Vec<u8>)> = B64_ALPHABET
-        .as_bytes()
-        .iter()
-        .map(|x| (*x, s.iter().map(|inp| *x ^ *inp).collect::<Vec<u8>>()))
-        .collect();
-
-    let y = z
-        .iter()
-        .map(|(k, chars)| (k, chars, calculate_frequency_score(chars)))
-        .fold((' ', "".to_owned(), 0.0), |acc, (&k, c, v)| {
-            if f64::max(acc.2, v) == v {
-                (k as char, str::from_utf8(c).unwrap().to_owned(), v)
-            } else {
-                acc
-            }
-        });
-
-    Ok(y)
+    Ok(decrypt_single_byte_xor(&s))
 }
 
 fn c4(filename: &str) -> Result<(char, String, String, f64)> {
     let input = std::fs::read_to_string(filename)?;
-    let mut max_line: (char, String, String, f64) = (' ', "".to_owned(), "".to_owned(), 0.0);
+    let mut min_line: (char, String, String, f64) = (' ', "".to_owned(), "".to_owned(), f64::MAX);
     for l in input.lines() {
         let s = hex_to_u8(l)?;
-        let z: Vec<(u8, Vec<u8>)> = B64_ALPHABET
-            .as_bytes()
-            .iter()
-            .map(|x| (*x, s.iter().map(|inp| *x ^ *inp).collect::<Vec<u8>>()))
-            .collect();
+        let y = decrypt_single_byte_xor(&s);
 
-        let y = z
-            .iter()
-            .map(|(k, chars)| (k, chars, calculate_frequency_score(chars)))
-            .fold(
-                (' ', "".to_owned(), 0.0),
-                |acc, (&k, c, v)| match str::from_utf8(c) {
-                    Ok(s) => {
-                        if f64::max(acc.2, v) == v {
-                            (k as char, s.to_owned(), v)
-                        } else {
-                            acc
-                        }
-                    }
-                    Err(_) => acc,
-                },
-            );
-
-        if f64::max(y.2, max_line.3) == y.2 {
-            max_line = (y.0, l.to_owned(), y.1, y.2);
+        if f64::min(y.2, min_line.3) == y.2 {
+            min_line = (y.0, l.to_owned(), y.1, y.2);
         }
     }
-    Ok(max_line)
+    Ok(min_line)
 }
 
 fn c5(input: &str) -> Result<String> {
@@ -92,19 +56,40 @@ fn c5(input: &str) -> Result<String> {
 }
 
 fn c6(filename: &str) -> Result<String> {
-    let input = std::fs::read_to_string(filename)?;
-    let input_as_bytes = input.as_bytes();
-    assert!(input_as_bytes.len() >= 80);
+    let input = decode_b64(&std::fs::read_to_string(filename)?);
+    let max_keysize = usize::min(40, input.len() / 2);
+    let mut possible_key = (0, usize::MAX); // (keysize, distance)
 
-    for keysize in 2..40 {
-        println!("first: {:?}", &input_as_bytes[..keysize]);
-        println!("second: {:?}", &input_as_bytes[keysize..keysize * 2]);
-        let z = hamming_distance(
-            &input_as_bytes[..keysize],
-            &input_as_bytes[keysize..keysize * 2],
-        );
-        println!("keysize: {}, distance: {}", keysize, z / keysize);
+    for keysize in 2..max_keysize {
+        let z = hamming_distance(&input[..keysize], &input[keysize..keysize * 2]) / keysize;
+        if usize::min(possible_key.1, z) == z {
+            possible_key = (keysize, z);
+        }
     }
+
+    let mut chunked: Vec<Vec<u8>> = Vec::new();
+    for i in input.chunks(possible_key.0) {
+        chunked.push(i.to_vec());
+    }
+
+    // Pre-tranpose (keysize 3)
+    // [ [ 29, 66, 31 ],
+    //   [ 77, 11, 15 ] ]
+    // Post-tranpose
+    // [ [ 29, 77 ],
+    //   [ 66, 11 ],
+    //   [ 31, 15 ] ]
+    let mut transposed: Vec<Vec<u8>> = vec![Vec::with_capacity(chunked.len()); chunked[0].len()];
+    for r in chunked {
+        for c in 0..r.len() {
+            transposed[c].push(r[c]);
+        }
+    }
+    for block in transposed {
+        let z = decrypt_single_byte_xor(&block);
+        println!("{:?}", z);
+    }
+
     Ok("ok!".to_owned())
 }
 
@@ -157,6 +142,11 @@ I go crazy when I hear a cymbal")?;
             c5,
             "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn challenge_6() -> Result<()> {
         Ok(())
     }
 }

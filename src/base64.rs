@@ -1,4 +1,4 @@
-use crate::{encode_table, Result};
+use crate::Result;
 
 use bitvec::prelude::*;
 use std::str;
@@ -31,6 +31,36 @@ pub fn encode_b64(input: &[u8]) -> Result<String> {
     Ok(str::from_utf8(&encoded)?.to_owned())
 }
 
+pub fn decode_b64(input: &str) -> Vec<u8> {
+    let mut r = Vec::new();
+    let mut bv = bitvec![u8, Msb0;];
+
+    // Remove any wrapping
+    for i in input.chars().filter(|c| !c.is_whitespace()) {
+        let pos = match i {
+            '+' => 62u8,
+            '/' => 63u8,
+            '=' => 64u8,
+            'a'..='z' => i as u8 % 32 + 25,
+            '0'..='9' => i as u8 % 32 + 36,
+            _ => i as u8 % 32 - 1,
+        };
+        if pos != 64u8 {
+            // these are 8 bits, so retrieve the last 6 bits
+            bv.extend_from_bitslice(&pos.view_bits::<Msb0>()[2..]);
+        }
+    }
+    for x in bv.chunks_exact(8) {
+        r.push(x.load_be::<u8>());
+    }
+
+    r
+}
+
+fn encode_table(alphabet: &str) -> [u8; 64] {
+    alphabet.as_bytes().try_into().unwrap()
+}
+
 fn align_up(num: usize, to: usize) -> usize {
     // By subtracting one, we get "as close as possible"
     // then we do integer division to get the "multiple"
@@ -58,6 +88,44 @@ mod tests {
         for (test, expected) in &tests {
             let b64 = encode_b64(test.as_bytes())?;
             assert_eq!(b64, expected.to_owned());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn decode_b64_str() -> Result<()> {
+        let tests = HashMap::from([
+            ("Cat", "Q2F0"),
+            ("Ca", "Q2E="),
+            ("C", "Qw=="),
+            ("light work.", "bGlnaHQgd29yay4="),
+            ("light work", "bGlnaHQgd29yaw=="),
+            ("light wor", "bGlnaHQgd29y"),
+            ("light wo", "bGlnaHQgd28="),
+            ("light w", "bGlnaHQgdw=="),
+        ]);
+        for (expected, test) in &tests {
+            let to_u8 = decode_b64(test);
+            assert_eq!(str::from_utf8(&to_u8)?, expected.to_owned());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn encode_decode_b64() -> Result<()> {
+        let tests = [
+            "Cat",
+            "Ca",
+            "C",
+            "light work.",
+            "light work",
+            "light wor",
+            "light wo",
+            "light w",
+        ];
+        for test in &tests {
+            let to_u8 = decode_b64(&encode_b64(test.as_bytes())?);
+            assert_eq!(str::from_utf8(&to_u8)?, test.to_owned());
         }
         Ok(())
     }
