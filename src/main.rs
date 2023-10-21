@@ -1,15 +1,12 @@
 #![allow(dead_code)]
 use cryptopals::{
     base64::{decode_b64, encode_b64},
-    cipher::repeating_key_xor,
-    decrypt_single_byte_xor, hamming_distance, hex_to_u8, Result,
+    cipher::{find_repeating_xor_key, find_single_byte_xor, repeating_xor},
+    hex_to_u8, Result,
 };
 use std::str;
 
 fn main() -> Result<()> {
-    c6("./inputs/s1c6_input.txt")?;
-    // c6("./inputs/s1c6_test.txt")?;
-
     Ok(())
 }
 
@@ -32,17 +29,17 @@ fn c2(hex1: &str, hex2: &str) -> Result<String> {
         .collect::<String>())
 }
 
-fn c3(input: &str) -> Result<(char, String, f64)> {
+fn c3(input: &str) -> Result<(u8, String, f64)> {
     let s = hex_to_u8(input)?;
-    Ok(decrypt_single_byte_xor(&s))
+    Ok(find_single_byte_xor(&s))
 }
 
-fn c4(filename: &str) -> Result<(char, String, String, f64)> {
+fn c4(filename: &str) -> Result<(u8, String, String, f64)> {
     let input = std::fs::read_to_string(filename)?;
-    let mut min_line: (char, String, String, f64) = (' ', "".to_owned(), "".to_owned(), f64::MAX);
+    let mut min_line: (u8, String, String, f64) = (0, "".to_owned(), "".to_owned(), f64::MAX);
     for l in input.lines() {
         let s = hex_to_u8(l)?;
-        let y = decrypt_single_byte_xor(&s);
+        let y = find_single_byte_xor(&s);
 
         if f64::min(y.2, min_line.3) == y.2 {
             min_line = (y.0, l.to_owned(), y.1, y.2);
@@ -52,45 +49,14 @@ fn c4(filename: &str) -> Result<(char, String, String, f64)> {
 }
 
 fn c5(input: &str) -> Result<String> {
-    Ok(repeating_key_xor("ICE", input))
+    Ok(repeating_xor("ICE".as_bytes(), input.as_bytes()))
 }
 
 fn c6(filename: &str) -> Result<String> {
     let input = decode_b64(&std::fs::read_to_string(filename)?);
-    let max_keysize = usize::min(40, input.len() / 2);
-    let mut possible_key = (0, usize::MAX); // (keysize, distance)
+    let key = find_repeating_xor_key(&input);
 
-    for keysize in 2..max_keysize {
-        let z = hamming_distance(&input[..keysize], &input[keysize..keysize * 2]) / keysize;
-        if usize::min(possible_key.1, z) == z {
-            possible_key = (keysize, z);
-        }
-    }
-
-    let mut chunked: Vec<Vec<u8>> = Vec::new();
-    for i in input.chunks(possible_key.0) {
-        chunked.push(i.to_vec());
-    }
-
-    // Pre-tranpose (keysize 3)
-    // [ [ 29, 66, 31 ],
-    //   [ 77, 11, 15 ] ]
-    // Post-tranpose
-    // [ [ 29, 77 ],
-    //   [ 66, 11 ],
-    //   [ 31, 15 ] ]
-    let mut transposed: Vec<Vec<u8>> = vec![Vec::with_capacity(chunked.len()); chunked[0].len()];
-    for r in chunked {
-        for c in 0..r.len() {
-            transposed[c].push(r[c]);
-        }
-    }
-    for block in transposed {
-        let z = decrypt_single_byte_xor(&block);
-        println!("{:?}", z);
-    }
-
-    Ok("ok!".to_owned())
+    Ok(str::from_utf8(&hex_to_u8(&repeating_xor(&key, &input))?)?.to_owned())
 }
 
 #[cfg(test)]
@@ -120,7 +86,7 @@ mod tests {
     #[test]
     fn challenge_3() -> Result<()> {
         let c3 = c3("1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736")?;
-        assert_eq!(c3.0, 'X');
+        assert_eq!(c3.0 as char, 'X');
         Ok(())
     }
 
@@ -147,6 +113,9 @@ I go crazy when I hear a cymbal")?;
 
     #[test]
     fn challenge_6() -> Result<()> {
+        let a = c6("./inputs/s1c6_input.txt")?;
+        let expected = std::fs::read_to_string("./inputs/s1c6_output.txt")?;
+        assert_eq!(a, expected);
         Ok(())
     }
 }

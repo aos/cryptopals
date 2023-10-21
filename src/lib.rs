@@ -44,30 +44,6 @@ pub fn calculate_fitting_quotient(input: &[u8]) -> f64 {
         / (dist_text.len() as f64)
 }
 
-pub fn decrypt_single_byte_xor(input: &[u8]) -> (char, String, f64) {
-    // XOR each byte in input with all u8 bytes
-    // collect by alphabet, XOR result
-    let z: Vec<(u8, Vec<u8>)> = (0..=255)
-        .map(|x| (x, crate::cipher::single_byte_xor(input, x)))
-        .collect();
-
-    z.iter()
-        // Calculate fitting quotient for each single byte XOR
-        .map(|(k, chars)| (k, chars, calculate_fitting_quotient(chars)))
-        // Make sure it's printable
-        .filter(|(_, c, _)| str::from_utf8(c).is_ok())
-        .fold(
-            (' ', String::new(), f64::MAX),
-            |acc, (&k, c, v)|
-                // get lowest fitting quotient
-                if f64::min(acc.2, v) == v {
-                    (k as char, str::from_utf8(c).unwrap().to_owned(), v)
-                } else {
-                    acc
-                }
-        )
-}
-
 pub fn hamming_distance(first: &[u8], second: &[u8]) -> usize {
     let f_bits = first.view_bits::<Lsb0>();
     let s_bits = second.view_bits::<Lsb0>();
