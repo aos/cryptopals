@@ -7,6 +7,8 @@ use cryptopals::{
 use std::str;
 
 fn main() -> Result<()> {
+    let a = c6("./inputs/s2c6_input.txt")?;
+    println!("{}", a);
     Ok(())
 }
 
