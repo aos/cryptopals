@@ -3,6 +3,7 @@ pub mod cipher;
 
 use bitvec::prelude::*;
 use std::error::Error;
+use std::fmt::Write;
 use std::str;
 
 pub type Result<T> = std::result::Result<T, Box<dyn Error>>;
@@ -26,10 +27,10 @@ pub fn hex_to_u8(hex: &str) -> Result<Vec<u8>> {
 }
 
 pub fn u8_to_hex(input: &[u8]) -> String {
-    input
-        .iter()
-        .map(|c| format!("{:02x}", c))
-        .collect::<String>()
+    input.iter().fold(String::new(), |mut a, c| {
+        write!(a, "{:02x}", c).unwrap();
+        a
+    })
 }
 
 // Given a stream of text bytes, calculates the letter frequency distribution and then gets the

@@ -4,11 +4,13 @@ use cryptopals::{
     cipher::{find_repeating_xor_key, find_single_byte_xor_key, make_repeating_xor},
     hex_to_u8, u8_to_hex, Result,
 };
+use openssl::symm::{decrypt, Cipher};
+use std::collections::HashSet;
 use std::str;
 
 fn main() -> Result<()> {
-    let a = c6("./inputs/s2c6_input.txt")?;
-    println!("{}", a);
+    let (num, line) = c8("./inputs/s1c8_input.txt")?;
+    println!("{}: {}", num, line);
     Ok(())
 }
 
@@ -25,10 +27,7 @@ fn c2(hex1: &str, hex2: &str) -> Result<String> {
         .zip(hex2_u8.iter())
         .for_each(|(x1, x2)| *x1 ^= *x2);
 
-    Ok(hex1_u8
-        .iter()
-        .map(|b| format!("{:02x}", b))
-        .collect::<String>())
+    Ok(u8_to_hex(&hex1_u8))
 }
 
 fn c3(input: &str) -> Result<(u8, String, f64)> {
@@ -64,9 +63,33 @@ fn c6(filename: &str) -> Result<String> {
     Ok(String::from_utf8(make_repeating_xor(&key, &input))?)
 }
 
+fn c7(filename: &str) -> Result<String> {
+    let data = decode_b64(&std::fs::read_to_string(filename)?);
+    let cipher = Cipher::aes_128_ecb();
+    let ciphertext = decrypt(cipher, b"YELLOW SUBMARINE", None, &data)?;
+
+    Ok(String::from_utf8(ciphertext)?)
+}
+
+fn c8(filename: &str) -> Result<(usize, String)> {
+    let ciphertexts = std::fs::read_to_string(filename)?;
+    for (num, line) in ciphertexts.lines().enumerate() {
+        let mut set = HashSet::new();
+        let decoded = hex_to_u8(line)?;
+        for c in decoded.chunks(16) {
+            if set.contains(c) {
+                return Ok((num + 1, line.to_owned()));
+            }
+            set.insert(c);
+        }
+    }
+    Err("Not detected!".into())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use openssl::symm::{decrypt, Cipher};
 
     #[test]
     fn challenge_1() -> Result<()> {
@@ -121,6 +144,27 @@ I go crazy when I hear a cymbal")?;
         let a = c6("./inputs/s1c6_input.txt")?;
         let expected = std::fs::read_to_string("./inputs/s1c6_output.txt")?;
         assert_eq!(a, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn challenge_7() -> Result<()> {
+        let data = decode_b64(&std::fs::read_to_string("./inputs/s1c7_input.txt")?);
+        let cipher = Cipher::aes_128_ecb();
+        let ciphertext = decrypt(cipher, b"YELLOW SUBMARINE", None, &data)?;
+        let expected = std::fs::read_to_string("./inputs/s1c6_output.txt")?;
+        assert_eq!(str::from_utf8(&ciphertext)?, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn challenge_8() -> Result<()> {
+        let (num, line) = c8("./inputs/s1c8_input.txt")?;
+        assert_eq!(num, 133);
+        assert_eq!(
+            line,
+            "d880619740a8a19b7840a8a31c810a3d08649af70dc06f4fd5d2d69c744cd283e2dd052f6b641dbf9d11b0348542bb5708649af70dc06f4fd5d2d69c744cd2839475c9dfdbc1d46597949d9c7e82bf5a08649af70dc06f4fd5d2d69c744cd28397a93eab8d6aecd566489154789a6b0308649af70dc06f4fd5d2d69c744cd283d403180c98c8f6db1f2a3f9c4040deb0ab51b29933f2c123c58386b06fba186a".to_owned()
+        );
         Ok(())
     }
 }

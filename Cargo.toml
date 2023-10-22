@@ -7,3 +7,5 @@ edition = "2021"
 
 [dependencies]
 bitvec = "1"
+openssl = "0.10"
+openssl-sys = "0.9"
