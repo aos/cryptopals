@@ -75,8 +75,22 @@ fn hamming_distance(first: &[u8], second: &[u8]) -> usize {
         .sum()
 }
 
+// TODO: easier to just return a new vec with padding added
+// than to pull old one I guess
+pub fn pad(src: &[u8], length: usize) -> Result<Vec<u8>> {
+    // let padding = (to - (src.len() % to)) % to;
+    if length < src.len() {
+        return Err("error: padding length smaller than src length".into());
+    }
+    let mut new = Vec::new();
+    new.extend_from_slice(src);
+    new.resize(length, b'\x04');
+
+    Ok(new)
+}
+
 #[cfg(test)]
-mod tests {
+mod lib {
     use super::*;
     use crate::base64::encode_b64;
     use std::collections::HashMap;
