@@ -117,20 +117,15 @@ pub fn decrypt_aes_128_ecb(input: &[u8], key: &[u8]) -> Result<Vec<u8>> {
 
 pub fn encrypt_aes_128_cbc(input: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u8>> {
     let mut buf: Vec<u8> = vec![];
-    let mut last: Vec<u8> = vec![];
+    let mut last = iv.to_vec();
 
-    for (i, chunk) in input.chunks(16).enumerate() {
+    for chunk in input.chunks(16) {
         let mut start = chunk.to_vec();
         if chunk.len() < 16 {
-            start = pkcs7_padding(&start, Cipher::aes_128_ecb().block_size())?;
+            start = add_pkcs7_padding(&start, Cipher::aes_128_ecb().block_size())?;
         }
 
-        if i == 0 {
-            start = make_repeating_xor(iv, &start);
-        } else {
-            start = make_repeating_xor(&last, &start);
-        }
-
+        start = make_repeating_xor(&start, &last);
         last = encrypt_aes_128_ecb(&start, key)?;
         buf.extend(&last);
     }
@@ -139,26 +134,25 @@ pub fn encrypt_aes_128_cbc(input: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u8
 
 pub fn decrypt_aes_128_cbc(input: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u8>> {
     let mut buf: Vec<u8> = vec![];
-    let mut ciphertext: Vec<u8> = vec![];
+    let mut last = iv.to_vec();
 
-    for (i, chunk) in input.chunks(16).enumerate() {
-        let mut to_plain = decrypt_aes_128_ecb(&chunk, key)?;
-        ciphertext = chunk.to_vec();
+    for chunk in input.chunks(16) {
+        let mut to_plain = decrypt_aes_128_ecb(chunk, key)?;
+        to_plain = make_repeating_xor(&to_plain, &last);
 
-        if i == 0 {
-            to_plain = make_repeating_xor(&to_plain, iv);
-        } else {
-            to_plain = make_repeating_xor(&to_plain, &ciphertext);
-        }
-
+        last = chunk.to_vec();
         buf.extend(&to_plain);
     }
+
+    // remove padding
+    let pad = *buf.last().ok_or("unavailable")? as usize;
+    buf.truncate(buf.len() - pad);
     Ok(buf)
 }
 
 // TODO: easier to just return a new vec with padding added
 // than to pull old one I guess
-pub fn pkcs7_padding(src: &[u8], block_size: usize) -> Result<Vec<u8>> {
+pub fn add_pkcs7_padding(src: &[u8], block_size: usize) -> Result<Vec<u8>> {
     let padding = block_size - (src.len() % block_size);
     if src.len() > block_size {
         return Err("error: padding length smaller than src length".into());
@@ -179,7 +173,7 @@ mod tests {
     fn pkcs7_pad() -> Result<()> {
         let to_pad = b"YELLOW SUBMARINE";
         let expected = b"YELLOW SUBMARINE\x04\x04\x04\x04";
-        let result = pkcs7_padding(to_pad, 20)?;
+        let result = add_pkcs7_padding(to_pad, 20)?;
         assert_eq!(expected, &result[..]);
         Ok(())
     }
@@ -201,7 +195,7 @@ mod tests {
 
         for i in text.chunks(16) {
             if i.len() < 16 {
-                let new = pkcs7_padding(i, Cipher::aes_128_ecb().block_size())?;
+                let new = add_pkcs7_padding(i, Cipher::aes_128_ecb().block_size())?;
                 let c = encrypt_aes_128_ecb(&new, key)?;
                 ciphertext.extend(c);
             } else {
@@ -222,7 +216,7 @@ mod tests {
         let message = b"The quick brown fox jumps over the lazy dog";
         let result = decrypt_aes_128_cbc(
             &encrypt_aes_128_cbc(message, key, &iv)?,
-            &iv, key
+            key, &iv
         )?;
         assert_eq!(&result, message);
         Ok(())

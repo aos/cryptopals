@@ -1,20 +1,28 @@
 #![allow(dead_code)]
 use cryptopals::{
-    cipher::{find_repeating_xor_key, find_single_byte_xor_key, make_repeating_xor, pkcs7_padding},
-    hex_to_u8, u8_to_hex, Result,
+    base64::decode_b64,
+    cipher::{add_pkcs7_padding, decrypt_aes_128_cbc},
+    Result,
 };
-
 use std::str;
 
 fn main() -> Result<()> {
-    let x = b"YELLOW SUBMARINE";
-    let z = pkcs7_padding(x, 20)?;
-    println!("{:?}", str::from_utf8(&z)?);
+    let z = c2("./inputs/s2c10_input.txt")?;
+    println!("{}", z);
     Ok(())
 }
 
 fn c1(input: &[u8]) -> Result<Vec<u8>> {
-    Ok(pkcs7_padding(input, 20)?)
+    add_pkcs7_padding(input, 20)
+}
+
+fn c2(filename: &str) -> Result<String> {
+    let data = decode_b64(&std::fs::read_to_string(filename)?);
+    let key = b"YELLOW SUBMARINE";
+    let iv = b"\x00".repeat(16);
+
+    let decoded = decrypt_aes_128_cbc(&data, key, &iv)?;
+    Ok(String::from_utf8(decoded)?)
 }
 
 #[cfg(test)]
@@ -28,6 +36,14 @@ mod set2 {
             a,
             b"YELLOW SUBMARINE\x04\x04\x04\x04",
         );
+        Ok(())
+    }
+
+    #[test]
+    fn challenge_2() -> Result<()> {
+        let decrypted = c2("./inputs/s2c10_input.txt")?;
+        let expected = std::fs::read_to_string("./inputs/s1c6_output.txt")?;
+        assert_eq!(decrypted, expected);
         Ok(())
     }
 }
