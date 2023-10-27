@@ -51,8 +51,8 @@ fn c4(filename: &str) -> Result<(u8, String, String, f64)> {
 
 fn c5(input: &str) -> Result<String> {
     Ok(u8_to_hex(&make_repeating_xor(
-        "ICE".as_bytes(),
         input.as_bytes(),
+        "ICE".as_bytes(),
     )))
 }
 
@@ -60,7 +60,7 @@ fn c6(filename: &str) -> Result<String> {
     let input = decode_b64(&std::fs::read_to_string(filename)?);
     let key = find_repeating_xor_key(&input);
 
-    Ok(String::from_utf8(make_repeating_xor(&key, &input))?)
+    Ok(String::from_utf8(make_repeating_xor(&input, &key))?)
 }
 
 fn c7(filename: &str) -> Result<String> {
