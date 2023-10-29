@@ -1,7 +1,14 @@
-use openssl::symm::{Cipher, Mode, Crypter};
+use openssl::symm::{Cipher, Crypter, Mode};
+use rand::Rng;
 
 use crate::{calculate_fitting_quotient, normalized_hamming_distance, Result};
 use std::str;
+
+#[derive(Debug)]
+pub enum CipherMode {
+    ECB,
+    CBC,
+}
 
 pub fn make_single_byte_xor(input: &[u8], key: u8) -> Vec<u8> {
     // XOR each byte in input with the key
@@ -77,16 +84,11 @@ pub fn find_repeating_xor_key(input: &[u8]) -> Vec<u8> {
     key
 }
 
-pub fn encrypt_aes_128_ecb(input: &[u8], key: &[u8]) -> Result<Vec<u8>> {
+fn encrypt_aes_128(input: &[u8], key: &[u8]) -> Result<Vec<u8>> {
     let block_size = Cipher::aes_128_ecb().block_size(); // 16 bytes
     assert_eq!(input.len(), block_size);
 
-    let mut encrypter = Crypter::new(
-        Cipher::aes_128_ecb(),
-        Mode::Encrypt,
-        key,
-        None,
-    )?;
+    let mut encrypter = Crypter::new(Cipher::aes_128_ecb(), Mode::Encrypt, key, None)?;
     encrypter.pad(false);
     let mut buf = vec![0; input.len() + block_size];
     let mut count = encrypter.update(input, &mut buf)?;
@@ -96,16 +98,11 @@ pub fn encrypt_aes_128_ecb(input: &[u8], key: &[u8]) -> Result<Vec<u8>> {
     Ok(buf)
 }
 
-pub fn decrypt_aes_128_ecb(input: &[u8], key: &[u8]) -> Result<Vec<u8>> {
+fn decrypt_aes_128(input: &[u8], key: &[u8]) -> Result<Vec<u8>> {
     let block_size = Cipher::aes_128_ecb().block_size(); // 16 bytes
     assert_eq!(input.len(), block_size);
 
-    let mut decrypter = Crypter::new(
-        Cipher::aes_128_ecb(),
-        Mode::Decrypt,
-        key,
-        None,
-    )?;
+    let mut decrypter = Crypter::new(Cipher::aes_128_ecb(), Mode::Decrypt, key, None)?;
     decrypter.pad(false);
     let mut buf = vec![0; input.len() + block_size];
     let mut count = decrypter.update(input, &mut buf)?;
@@ -115,7 +112,7 @@ pub fn decrypt_aes_128_ecb(input: &[u8], key: &[u8]) -> Result<Vec<u8>> {
     Ok(buf)
 }
 
-pub fn encrypt_aes_128_cbc(input: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u8>> {
+fn encrypt_aes_128_cbc(input: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u8>> {
     let mut buf: Vec<u8> = vec![];
     let mut last = iv.to_vec();
 
@@ -126,18 +123,18 @@ pub fn encrypt_aes_128_cbc(input: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u8
         }
 
         start = make_repeating_xor(&start, &last);
-        last = encrypt_aes_128_ecb(&start, key)?;
+        last = encrypt_aes_128(&start, key)?;
         buf.extend(&last);
     }
     Ok(buf)
 }
 
-pub fn decrypt_aes_128_cbc(input: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u8>> {
+fn decrypt_aes_128_cbc(input: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u8>> {
     let mut buf: Vec<u8> = vec![];
     let mut last = iv.to_vec();
 
     for chunk in input.chunks(16) {
-        let mut to_plain = decrypt_aes_128_ecb(chunk, key)?;
+        let mut to_plain = decrypt_aes_128(chunk, key)?;
         to_plain = make_repeating_xor(&to_plain, &last);
 
         last = chunk.to_vec();
@@ -148,6 +145,67 @@ pub fn decrypt_aes_128_cbc(input: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u8
     let pad = *buf.last().ok_or("unavailable")? as usize;
     buf.truncate(buf.len() - pad);
     Ok(buf)
+}
+
+fn gen_aes_128_key() -> [u8; 16] {
+    let mut v = [0; 16];
+    rand::thread_rng().fill(&mut v);
+    v
+}
+
+pub fn encryption_oracle(input: &[u8]) -> Result<Vec<u8>> {
+    let mut rng = rand::thread_rng();
+    let fill_before: u8 = rng.gen_range(5..=10);
+    let fill_after: u8 = rng.gen_range(5..=10);
+    let mode = if rng.gen::<bool>() { CipherMode::ECB } else { CipherMode::CBC };
+    let mut start: Vec<u8> = vec![];
+    let key = gen_aes_128_key();
+    let mut iv = [0; 16];
+    rng.fill(&mut iv);
+
+    for _ in 0..=fill_before {
+        start.push(rng.gen());
+    }
+    start.extend(input);
+    for _ in 0..=fill_after {
+        start.push(rng.gen());
+    }
+
+    encrypt(mode, &start, &key[..], Some(&iv[..]))
+}
+
+pub fn encrypt(mode: CipherMode, input: &[u8], key: &[u8], iv: Option<&[u8]>) -> Result<Vec<u8>> {
+    match mode {
+        CipherMode::ECB => {
+            let mut buf: Vec<u8> = vec![];
+            for chunk in input.chunks(16) {
+                let mut start = chunk.to_vec();
+                if chunk.len() < 16 {
+                    start = add_pkcs7_padding(&start, Cipher::aes_128_ecb().block_size())?;
+                }
+                start = encrypt_aes_128(&start, key)?;
+                buf.extend(&start);
+            }
+            Ok(buf)
+        }
+        CipherMode::CBC => encrypt_aes_128_cbc(input, key, iv.unwrap()),
+    }
+}
+
+pub fn decrypt(mode: CipherMode, input: &[u8], key: &[u8], iv: Option<&[u8]>) -> Result<Vec<u8>> {
+    match mode {
+        CipherMode::ECB => {
+            let mut buf: Vec<u8> = vec![];
+            for chunk in input.chunks(16) {
+                buf.extend(&decrypt_aes_128(chunk, key)?);
+            }
+            // remove padding
+            let pad = *buf.last().ok_or("unavailable")? as usize;
+            buf.truncate(buf.len() - pad);
+            Ok(buf)
+        }
+        CipherMode::CBC => decrypt_aes_128_cbc(input, key, iv.unwrap()),
+    }
 }
 
 // TODO: easier to just return a new vec with padding added
@@ -167,7 +225,6 @@ pub fn add_pkcs7_padding(src: &[u8], block_size: usize) -> Result<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use openssl::symm::{Cipher, encrypt};
 
     #[test]
     fn pkcs7_pad() -> Result<()> {
@@ -179,10 +236,10 @@ mod tests {
     }
 
     #[test]
-    fn encrypt_decrypt_aes_128_ecb() -> Result<()> {
+    fn encrypt_decrypt_aes_128() -> Result<()> {
         let key = b"YELLOW SUBMARINE";
         let message = b"The quick brown ";
-        let result = decrypt_aes_128_ecb(&encrypt_aes_128_ecb(message, key)?, key)?;
+        let result = decrypt_aes_128(&encrypt_aes_128(message, key)?, key)?;
         assert_eq!(&result, message);
         Ok(())
     }
@@ -191,21 +248,25 @@ mod tests {
     fn compare_openssl_aes_128_ecb() -> Result<()> {
         let text = b"The quick brown fox jumps over the lazy dog";
         let key = b"YELLOW SUBMARINE";
-        let mut ciphertext = vec![];
 
-        for i in text.chunks(16) {
-            if i.len() < 16 {
-                let new = add_pkcs7_padding(i, Cipher::aes_128_ecb().block_size())?;
-                let c = encrypt_aes_128_ecb(&new, key)?;
-                ciphertext.extend(c);
-            } else {
-                let c = encrypt_aes_128_ecb(i, key)?;
-                ciphertext.extend(c);
-            }
-        }
-
-        let compare = encrypt(Cipher::aes_128_ecb(), key, None, text)?;
+        let ciphertext = encrypt(CipherMode::ECB, text, key, None)?;
+        let compare =
+            openssl::symm::encrypt(openssl::symm::Cipher::aes_128_ecb(), key, None, text)?;
         assert_eq!(ciphertext, compare);
+        Ok(())
+    }
+
+    #[test]
+    fn encrypt_decrypt_aes_128_ecb() -> Result<()> {
+        let key = b"YELLOW SUBMARINE";
+        let message = b"The quick brown fox jumps over the lazy dog";
+        let result = decrypt(
+            CipherMode::ECB,
+            &encrypt(CipherMode::ECB, message, key, None)?,
+            key,
+            None,
+        )?;
+        assert_eq!(&result, message);
         Ok(())
     }
 
@@ -214,10 +275,7 @@ mod tests {
         let key = b"YELLOW SUBMARINE";
         let iv = b"\x00".repeat(16);
         let message = b"The quick brown fox jumps over the lazy dog";
-        let result = decrypt_aes_128_cbc(
-            &encrypt_aes_128_cbc(message, key, &iv)?,
-            key, &iv
-        )?;
+        let result = decrypt_aes_128_cbc(&encrypt_aes_128_cbc(message, key, &iv)?, key, &iv)?;
         assert_eq!(&result, message);
         Ok(())
     }

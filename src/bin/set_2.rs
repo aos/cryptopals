@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use cryptopals::{
     base64::decode_b64,
-    cipher::{add_pkcs7_padding, decrypt_aes_128_cbc},
+    cipher::{add_pkcs7_padding, decrypt, CipherMode},
     Result,
 };
 use std::str;
@@ -21,7 +21,7 @@ fn c2(filename: &str) -> Result<String> {
     let key = b"YELLOW SUBMARINE";
     let iv = b"\x00".repeat(16);
 
-    let decoded = decrypt_aes_128_cbc(&data, key, &iv)?;
+    let decoded = decrypt(CipherMode::CBC, &data, key, Some(&iv))?;
     Ok(String::from_utf8(decoded)?)
 }
 
@@ -32,10 +32,7 @@ mod set2 {
     #[test]
     fn challenge_1() -> Result<()> {
         let a = c1(b"YELLOW SUBMARINE")?;
-        assert_eq!(
-            a,
-            b"YELLOW SUBMARINE\x04\x04\x04\x04",
-        );
+        assert_eq!(a, b"YELLOW SUBMARINE\x04\x04\x04\x04",);
         Ok(())
     }
 
