@@ -157,17 +157,22 @@ pub fn encryption_oracle(input: &[u8]) -> Result<Vec<u8>> {
     let mut rng = rand::thread_rng();
     let fill_before: u8 = rng.gen_range(5..=10);
     let fill_after: u8 = rng.gen_range(5..=10);
-    let mode = if rng.gen::<bool>() { CipherMode::ECB } else { CipherMode::CBC };
+    let mode = if rng.gen::<bool>() {
+        CipherMode::ECB
+    } else {
+        CipherMode::CBC
+    };
+
     let mut start: Vec<u8> = vec![];
     let key = gen_aes_128_key();
     let mut iv = [0; 16];
     rng.fill(&mut iv);
 
-    for _ in 0..=fill_before {
+    for _ in 0..fill_before {
         start.push(rng.gen());
     }
     start.extend(input);
-    for _ in 0..=fill_after {
+    for _ in 0..fill_after {
         start.push(rng.gen());
     }
 
