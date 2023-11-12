@@ -1,8 +1,10 @@
-use cryptopals::cipher::encryption_oracle;
 use cryptopals::Result;
 
 fn main() -> Result<()> {
-    let message = b"The quick brown fox jumps over the lazy dog";
-    let z = encryption_oracle(message)?;
+    let s = "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkg\
+            aGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBq\
+            dXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUg\
+            YnkK";
+    println!("{}", s);
     Ok(())
 }

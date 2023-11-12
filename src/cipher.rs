@@ -1,3 +1,4 @@
+use crate::base64::decode_b64;
 use openssl::symm::{Cipher, Crypter, Mode};
 use rand::Rng;
 
@@ -177,6 +178,30 @@ pub fn encryption_oracle(input: &[u8]) -> Result<Vec<u8>> {
     }
 
     encrypt(mode, &start, &key[..], Some(&iv[..]))
+}
+
+pub fn oracle_two(input: &[u8], key: &[u8]) -> Result<Vec<u8>> {
+    let mut rng = rand::thread_rng();
+    let s = decode_b64("Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkg\
+            aGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBq\
+            dXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUg\
+            YnkK");
+    let fill_before: u8 = rng.gen_range(5..=10);
+    let fill_after: u8 = rng.gen_range(5..=10);
+    let mode = CipherMode::ECB;
+
+    let mut start: Vec<u8> = vec![];
+
+    for _ in 0..fill_before {
+        start.push(rng.gen());
+    }
+    start.extend(input);
+    for _ in 0..fill_after {
+        start.push(rng.gen());
+    }
+    start.extend(s);
+
+    encrypt(mode, &start, key, None)
 }
 
 pub fn encrypt(mode: CipherMode, input: &[u8], key: &[u8], iv: Option<&[u8]>) -> Result<Vec<u8>> {

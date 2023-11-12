@@ -41,6 +41,10 @@ fn c11(f: impl Fn(&[u8]) -> Result<Vec<u8>>) -> Result<CipherMode> {
     Ok(CipherMode::CBC)
 }
 
+fn c12() -> Result<()> {
+    Ok(())
+}
+
 #[cfg(test)]
 mod set2 {
     use super::*;
